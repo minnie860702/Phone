@@ -473,18 +473,9 @@
         statusHtml = `<span class="rank-new" style="background:rgba(239,68,68,0.12); color:#ef4444;">${item.status}</span>`;
       }
       
-      let rankHtml = '';
-      if (top20 && top20.length > 0) {
-        const invN = normalizeModelName(item.model);
-        const found = top20.find(t => normalizeModelName(t.model) === invN);
-        if (found) {
-          rankHtml = `<span style="margin-left:8px; font-size:0.7rem; background:rgba(251,191,36,0.15); color:var(--gold); padding:2px 6px; border-radius:4px; font-weight:700;">Top ${found.rank}</span>`;
-        }
-      }
-
       tr.innerHTML = `
         <td style="font-weight:700; color:var(--text-primary); font-size:0.85rem;">${item.id}</td>
-        <td style="font-size:0.85rem; color:var(--text-secondary);">${item.model}${rankHtml}</td>
+        <td style="font-size:0.85rem; color:var(--text-secondary);">${item.model}</td>
         <td style="text-align:center;">${statusHtml}</td>
       `;
       tbody.appendChild(tr);
