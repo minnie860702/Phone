@@ -1,0 +1,1343 @@
+﻿<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>整合系統 - 手機盤點 & 裝置狀態總覽</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        body { font-family: 'Noto Sans TC', sans-serif; margin: 0; padding: 0; }
+        
+        /* 手機盤點專屬樣式 */
+        .tab-active { color: #2563eb; border-bottom: 3px solid #2563eb; font-weight: bold; }
+        #inv-loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 9999; flex-direction: column; align-items: center; justify-content: center; display: none; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .settings-box { background: #374151; color: white; font-size: 12px; padding: 8px; }
+        .settings-content { display: none; margin-top: 8px; }
+        .settings-box.open .settings-content { display: block; }
+        canvas { touch-action: none; cursor: crosshair; }
+        .detail-input { font-size: 12px; padding: 6px; border: 1px solid #d1d5db; border-radius: 6px; width: 100%; }
+        .detail-input:focus { border-color: #3b82f6; outline: none; ring: 2px; }
+    </style>
+</head>
+<body>
+
+    <div class="fixed top-0 inset-x-0 h-14 bg-gray-900 z-[10000] flex items-center justify-center gap-4 shadow-md">
+        <button onclick="switchMainTab('inventory')" id="main-tab-inv" class="px-6 py-2 rounded-full bg-blue-600 text-white font-bold transition-all shadow-lg">手機盤點系統</button>
+        <button onclick="switchMainTab('overview')" id="main-tab-over" class="px-6 py-2 rounded-full bg-gray-700 text-gray-300 font-bold transition-all hover:bg-gray-600">裝置狀態總覽</button>
+        
+        <a href="https://docs.google.com/document/d/11_PaC36J_IkBtCujeUQdoV6vuCALMZYvTN7DhtuuqFU/edit?usp=sharing" target="_blank" class="absolute right-4 flex items-center gap-1.5 text-gray-300 hover:text-white text-sm font-medium transition-colors" title="查看系統說明書">
+            <i class="fas fa-book-open"></i>
+            <span class="hidden sm:inline">系統說明書</span>
+        </a>
+    </div>
+
+    <div id="app-inventory" style="padding-top: 56px; padding-bottom: 140px; background-color: #f3f4f6; min-height: 100vh;">
+        <div id="settings-area" class="settings-box relative z-[100]">
+            <div class="flex justify-between items-center cursor-pointer" onclick="toggleSettings()">
+                <span><i class="fas fa-cog mr-1"></i> 系統連線設定 (若連線失敗請點此檢查)</span>
+                <i class="fas fa-chevron-down transform transition-transform" id="settings-arrow"></i>
+            </div>
+            <div class="settings-content">
+                <label class="block text-gray-400 mb-1">Google Apps Script URL (後端網址):</label>
+                <input type="text" id="api-url-input" class="w-full p-2 text-black rounded mb-2 text-xs font-mono" 
+                       placeholder="https://script.google.com/..." 
+                       onchange="saveApiUrl()">
+                <div class="flex gap-2">
+                    <button onclick="saveApiUrl(); showMessage('設定已儲存', '網址已更新，系統將重新整理。', () => location.reload());" class="bg-blue-600 px-3 py-1 rounded hover:bg-blue-500">儲存並重整</button>
+                    <button onclick="resetApiUrl()" class="bg-red-600 px-3 py-1 rounded hover:bg-red-500">恢復預設值</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="inv-loading-overlay">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mb-4"></div>
+            <p class="text-gray-600 font-bold" id="inv-loading-text">處理中...</p>
+        </div>
+
+        <div id="system-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[200]">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden transform transition-all scale-100">
+                <div id="modal-header" class="bg-gray-800 p-4 text-white font-bold flex items-center">
+                    <i id="modal-icon" class="fas fa-info-circle mr-2"></i>
+                    <span id="modal-title">系統訊息</span>
+                </div>
+                <div class="p-6">
+                    <p id="modal-message" class="text-gray-700 text-sm mb-6 leading-relaxed whitespace-pre-wrap">訊息內容...</p>
+                    <div class="flex gap-3" id="modal-actions"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="signature-modal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[150]">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col">
+                <div class="bg-blue-600 p-3 text-white flex justify-between items-center">
+                    <h3 class="font-bold"><i class="fas fa-pen-nib mr-2"></i>借用人簽名</h3>
+                    <button onclick="closeSignatureModal(false)"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="p-4 flex-1 bg-gray-100 flex justify-center items-center h-64 sm:h-80 w-full">
+                    <canvas id="sig-canvas" class="bg-white border-2 border-dashed border-gray-400 rounded shadow-inner w-full h-full touch-none"></canvas>
+                </div>
+                <div class="p-4 bg-white border-t flex gap-3">
+                    <button onclick="clearSignature()" class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50"><i class="fas fa-eraser mr-1"></i>清除</button>
+                    <button onclick="confirmSignature()" class="flex-1 px-4 py-2 bg-blue-600 text-white font-bold rounded-lg shadow hover:bg-blue-700">確認簽名</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="temp-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+                <div class="bg-amber-500 p-4 text-white flex justify-between items-center">
+                    <h3 class="font-bold text-lg"><i class="fas fa-save mr-2"></i>暫存進度確認</h3>
+                    <button onclick="closeInvModal('temp-modal')"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="p-6">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">登記人員姓名 <span class="text-red-500">*</span></label>
+                    <select id="registrar-name" class="w-full p-3 border rounded-xl mb-4 outline-none focus:ring-2 focus:ring-amber-500">
+                        <option value="">-- 請選擇您的姓名 --</option>
+                        <option value="許昕慈">許昕慈</option>
+                        <option value="簡伶珊">簡伶珊</option>
+                        <option value="許庭瑊">許庭瑊</option>
+                        <option value="彭毓雯">彭毓雯</option>
+                        <option value="王溶蓁">王溶蓁</option>
+                        <option value="秦嘉佑">秦嘉佑</option>
+                        <option value="郭冠麟">郭冠麟</option>
+                        <option value="江冠錡">江冠錡</option>
+                        <option value="李敏瑞">李敏瑞</option>
+                        <option value="呂孟軒">呂孟軒</option>
+                        <option value="穆道生">穆道生</option>
+                        <option value="林敏雄">林敏雄</option>
+                        <option value="林榆昕">林榆昕</option>
+                        <option value="洪全緯">洪全緯</option>
+                        <option value="蔡曜宇">蔡曜宇</option>
+                        <option value="王雯鈺">王雯鈺</option>
+                        <option value="周啟堂">周啟堂</option>
+                        <option value="宋灝平">宋灝平</option>
+                    </select>
+
+                    <p class="text-[10px] text-gray-400 mb-2">本次變更預覽：</p>
+                    <div id="change-preview" class="text-xs bg-gray-50 p-3 rounded-lg max-h-40 overflow-y-auto mb-6 border font-mono"></div>
+                    <div class="flex gap-3">
+                        <button onclick="closeInvModal('temp-modal')" class="flex-1 py-3 border rounded-xl hover:bg-gray-100 transition-colors">取消</button>
+                        <button onclick="confirmSave()" id="save-btn" class="flex-1 py-3 bg-amber-500 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all">確認儲存</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="submit-modal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-[100]">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+                <div class="bg-green-600 p-4 text-white flex justify-between items-center">
+                    <h3 class="font-bold text-lg"><i class="fas fa-cloud-upload-alt mr-2"></i>確認正式上傳</h3>
+                    <button onclick="closeInvModal('submit-modal')"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="p-6">
+                    <p class="text-sm text-gray-600 mb-4 leading-relaxed">
+                        這將執行以下動作：<br>
+                        1. 覆蓋雲端的「今日盤點資料」。<br>
+                        2. 清空所有的「暫存紀錄」。<br>
+                        3. 更新出借狀態與簽名。
+                    </p>
+                    
+                    <div class="mb-5 bg-blue-50 border border-blue-100 rounded-lg p-3 flex justify-center">
+                        <a href="https://docs.google.com/spreadsheets/d/1LsuBSpaKrnXN6GKM-6AFMbA9T286_TK3u9sQ9bzl2Pc/edit?usp=sharing" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm font-bold flex items-center gap-2 transition-colors">
+                            <i class="fas fa-table"></i> 點擊開啟後端資料表 (Google Sheets)
+                        </a>
+                    </div>
+
+                    <label class="block text-sm font-bold text-gray-700 mb-2">主責盤點人員 <span class="text-red-500">*</span></label>
+                    <select id="submit-main-user" class="w-full p-3 bg-gray-50 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-green-500 mb-6">
+                        <option value="">-- 請選取正式上傳的主責人員 --</option>
+                        <option value="昕慈">昕慈</option><option value="零三">零三</option><option value="庭瑊">庭瑊</option><option value="HAMA">HAMA</option>
+                        <option value="阿布">阿布</option><option value="嘉佑">嘉佑</option><option value="大軍">大軍</option><option value="冠錡">冠錡</option>
+                        <option value="敏瑞">敏瑞</option><option value="孟孟">孟孟</option><option value="阿穆">阿穆</option><option value="小雄">小雄</option>
+                    </select>
+                    
+                    <div class="flex gap-3">
+                        <button onclick="closeInvModal('submit-modal')" class="flex-1 py-3 border rounded-xl hover:bg-gray-100 transition-colors">取消</button>
+                        <button onclick="confirmSubmitFinal()" class="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg active:scale-95 transition-all">確定提交</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <header class="bg-white shadow-sm sticky top-[56px] z-50 p-4">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <h1 class="font-bold text-xl text-gray-800 flex items-center"><i class="fas fa-mobile-alt mr-2 text-blue-600"></i>手機盤點 V3.11</h1>
+                
+                <div class="flex gap-2">
+                    <button onclick="checkMissingPeople()" class="text-amber-600 text-sm font-bold hover:bg-amber-50 px-3 py-1 rounded-lg transition-all border border-amber-200 shadow-sm"><i class="fas fa-user-clock"></i> 一鍵抓漏</button>
+                    <button onclick="fetchData()" class="text-blue-600 text-sm font-bold hover:bg-blue-50 px-3 py-1 rounded-lg transition-all border border-blue-200 shadow-sm"><i class="fas fa-sync-alt"></i> 同步最新</button>
+                </div>
+            </div>
+        </header>
+
+        <main class="max-w-6xl mx-auto p-4">
+            <!-- 新增的完成提示橫幅 -->
+            <div id="completion-banner" class="hidden mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 items-center gap-4 shadow-sm relative overflow-hidden">
+                <div class="absolute right-0 top-0 w-24 h-24 bg-emerald-100 rounded-full -mr-10 -mt-10 opacity-50 pointer-events-none"></div>
+                <div class="p-3 bg-emerald-100 text-emerald-600 rounded-full shrink-0 z-10">
+                    <i class="fas fa-check-double text-2xl"></i>
+                </div>
+                <div class="z-10">
+                    <h3 class="font-black text-emerald-800 text-lg">今日已盤點完成 🎉</h3>
+                    <p class="text-xs font-bold text-emerald-600 mt-1" id="completion-time-text">雲端已成功建立今日盤點表</p>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-2xl shadow-sm border mb-6">
+                <div class="flex flex-col md:flex-row md:items-end gap-6 mb-4">
+                    <div>
+                        <p class="text-xs text-gray-400 font-bold uppercase tracking-widest">手機總數</p>
+                        <p class="text-4xl font-black text-blue-600" id="total-count">0</p>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-red-500 font-bold mb-2 flex items-center"><i class="fas fa-exclamation-triangle mr-1"></i> 待盤點 (點擊跳轉)：</p>
+                        <div id="missing-tags" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+                
+                <div class="w-full">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                            <i class="fas fa-search"></i>
+                        </span>
+                        <input type="text" id="inv-search-input" 
+                               class="w-full pl-10 pr-10 py-3 bg-gray-50 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-500" 
+                               placeholder="搜尋手機編號或型號..."
+                               oninput="handleSearch(this.value)">
+                        <button id="clear-search" onclick="clearSearch()" class="hidden absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600">
+                            <i class="fas fa-times-circle"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex overflow-x-auto border-b mb-4 text-sm no-scrollbar bg-white sticky top-[124px] z-40 rounded-t-xl">
+                <button onclick="switchInvTab('all', this)" class="tab-btn px-6 py-4 tab-active">全部</button>
+                <button onclick="switchInvTab('A', this)" class="tab-btn px-6 py-4 text-gray-500">A 系列</button>
+                <button onclick="switchInvTab('I', this)" class="tab-btn px-6 py-4 text-gray-500">I 系列</button>
+                <button onclick="switchInvTab('O', this)" class="tab-btn px-6 py-4 text-gray-500">O 系列</button>
+                <button onclick="switchInvTab('C', this)" class="tab-btn px-6 py-4 text-gray-500">C 系列</button>
+                <button onclick="switchInvTab('un', this)" class="tab-btn px-6 py-4 text-red-500 font-bold">⚠️ 未完成</button>
+            </div>
+
+            <div id="grid-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"></div>
+            
+            <div id="no-result" class="hidden py-20 text-center">
+                <i class="fas fa-search-minus text-4xl text-gray-300 mb-4"></i>
+                <p class="text-gray-500">找不到符合條件的手機</p>
+            </div>
+        </main>
+
+        <footer class="fixed bottom-0 inset-x-0 bg-white/80 backdrop-blur-md border-t p-4 flex gap-3 z-50">
+            <button onclick="openTempModal()" class="flex-1 bg-amber-500 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all">暫存進度</button>
+            <button onclick="trySubmitFinal()" id="submit-btn" class="flex-1 bg-green-600 text-white font-bold py-4 rounded-2xl shadow-lg active:scale-95 transition-all">正式上傳</button>
+        </footer>
+    </div>
+
+
+    <div id="app-overview" class="hidden min-h-screen bg-slate-50 text-slate-800 font-sans" style="padding-top: 72px; padding-bottom: 2rem; padding-left: 1rem; padding-right: 1rem;">
+        <div class="max-w-7xl mx-auto space-y-6">
+            
+            <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="monitor-smartphone" class="w-7 h-7 text-blue-600"></i>
+                        裝置狀態總覽系統
+                    </h1>
+                    <p class="text-slate-500 text-sm mt-1">
+                        讀取雲端試算表自動比對狀態。點擊卡片可設定「測試中」狀態。
+                    </p>
+                </div>
+                <div class="flex bg-white rounded-lg p-1 border border-slate-200 shadow-sm shrink-0">
+                    <button id="btn-tab-overview" onclick="switchOverviewInnerTab('overview')" class="px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 bg-blue-50 text-blue-700">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                        總覽報表
+                    </button>
+                    <button id="btn-tab-update" onclick="switchOverviewInnerTab('update')" class="px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 text-slate-600 hover:bg-slate-50">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+                        資料同步
+                    </button>
+                </div>
+            </header>
+
+            <div id="view-overview" class="space-y-6">
+                
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-blue-100 text-blue-600 rounded-lg hidden sm:block">
+                            <i data-lucide="layout-dashboard" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm font-medium text-slate-500">總裝置數</p>
+                            <p id="stat-total" class="text-xl sm:text-2xl font-bold text-slate-800">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-emerald-100 text-emerald-600 rounded-lg hidden sm:block">
+                            <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm font-medium text-slate-500">庫存可用</p>
+                            <p id="stat-available" class="text-xl sm:text-2xl font-bold text-emerald-600">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-sky-100 text-sky-600 rounded-lg hidden sm:block">
+                            <i data-lucide="flask-conical" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm font-medium text-slate-500">測試中</p>
+                            <p id="stat-testing" class="text-xl sm:text-2xl font-bold text-sky-600">0</p>
+                        </div>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+                        <div class="p-3 bg-amber-100 text-amber-600 rounded-lg hidden sm:block">
+                            <i data-lucide="alert-circle" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <p class="text-xs sm:text-sm font-medium text-slate-500">未歸還 (出借)</p>
+                            <p id="stat-borrowed" class="text-xl sm:text-2xl font-bold text-amber-600">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                    <div class="relative w-full sm:w-80">
+                        <i data-lucide="search" class="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                        <input id="over-search-input" type="text" placeholder="搜尋編號、型號、單位、借用人、測試人..." class="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all">
+                    </div>
+                    
+                    <div class="flex bg-slate-100 rounded-lg p-1 w-full sm:w-auto overflow-x-auto">
+                        <button data-filter="all" onclick="setFilter('all')" class="filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-slate-800 shadow-sm">全部</button>
+                        <button data-filter="available" onclick="setFilter('available')" class="filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-500 hover:text-slate-700">在庫</button>
+                        <button data-filter="testing" onclick="setFilter('testing')" class="filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-500 hover:text-slate-700">測試中</button>
+                        <button data-filter="borrowed" onclick="setFilter('borrowed')" class="filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-500 hover:text-slate-700">出借中</button>
+                    </div>
+                </div>
+
+                <div id="card-container" class="space-y-8">
+                    <div class="py-12 text-center text-slate-500 italic bg-white rounded-xl border border-slate-200 shadow-sm">系統載入中，請稍候...</div>
+                </div>
+            </div>
+
+            <div id="view-update" class="space-y-6 hidden">
+                <div class="bg-white p-8 rounded-xl shadow-sm border border-slate-200 text-center space-y-6">
+                    <div class="inline-flex p-4 bg-blue-50 text-blue-600 rounded-full mb-2">
+                        <i data-lucide="cloud-lightning" class="w-10 h-10"></i>
+                    </div>
+                    <h2 class="text-xl font-bold text-slate-800">雲端同步設定</h2>
+                    
+                    <div class="max-w-2xl mx-auto p-6 bg-blue-50/50 rounded-xl border border-blue-100 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="timer" class="w-5 h-5 text-blue-600"></i>
+                                <span class="font-bold text-slate-700">自動定期同步</span>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="auto-sync-toggle" class="sr-only peer" onchange="toggleAutoSync()">
+                                <div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div id="auto-sync-options" class="flex flex-col sm:flex-row items-center gap-4 text-sm opacity-50 pointer-events-none transition-opacity">
+                            <div class="flex items-center gap-2">
+                                <span>每隔</span>
+                                <input type="number" id="sync-interval-input" value="5" min="1" max="1440" onchange="updateSyncInterval()" class="w-20 px-3 py-1.5 bg-white border border-slate-200 rounded text-center focus:ring-2 focus:ring-blue-500 outline-none">
+                                <span>分鐘自動同步一次</span>
+                            </div>
+                            <div id="next-sync-counter" class="text-blue-600 font-medium italic">
+                                (未啟用自動同步)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="sync-status" class="text-sm text-slate-400">上次更新時間：尚未更新</div>
+
+                    <div class="flex justify-center gap-4">
+                        <button id="btn-sync-now" onclick="syncOverviewData()" class="px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-all flex items-center gap-2">
+                            <i data-lucide="refresh-cw" class="w-5 h-5" id="sync-icon"></i>
+                            立即手動同步
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="test-modal" class="fixed inset-0 bg-slate-900/40 hidden items-center justify-center z-[150] backdrop-blur-sm transition-opacity">
+            <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl transform transition-transform scale-95" id="test-modal-content">
+                <div class="flex justify-between items-center mb-5">
+                    <h3 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                        <i data-lucide="flask-conical" class="w-5 h-5 text-sky-500"></i>
+                        設定測試狀態
+                    </h3>
+                    <button onclick="closeOverviewModal()" class="text-slate-400 hover:text-slate-600">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <div class="mb-5 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                    <div class="text-xs text-slate-500 mb-1">目標裝置</div>
+                    <div id="modal-device-id" class="font-mono text-sm text-slate-700 font-semibold"></div>
+                    <div id="modal-device-model" class="font-bold text-slate-900 mt-0.5"></div>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">測試人 (品檢同仁)</label>
+                    <div class="relative">
+                        <select id="modal-nickname" class="w-full px-4 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500 transition-all appearance-none cursor-pointer">
+                            <option value="">-- 結束測試 (恢復在庫) --</option>
+                        </select>
+                        <i data-lucide="chevron-down" class="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"></i>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">※ 選擇同仁將標記為「測試中」<br>※ 選擇「結束測試」並儲存則恢復為「在庫」</p>
+                </div>
+
+                <div class="flex justify-between items-center w-full">
+                    <button id="btn-return-test" onclick="clearAndSaveTest()" class="hidden px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors items-center gap-2">
+                        <i data-lucide="check-circle" class="w-4 h-4"></i>
+                        歸還
+                    </button>
+                    <div class="flex gap-3 ml-auto">
+                        <button onclick="closeOverviewModal()" class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors">取消</button>
+                        <button onclick="saveTestStatus()" class="px-5 py-2 text-sm font-medium text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors flex items-center gap-2">
+                            <i data-lucide="save" class="w-4 h-4"></i>
+                            儲存變更
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast-container" class="fixed bottom-5 right-5 z-[160] flex flex-col gap-3 pointer-events-none"></div>
+    </div>
+
+
+    <script>
+        /* -------------------------------------------------------------------------- */
+        /* 頂部導覽列切換邏輯                                 */
+        /* -------------------------------------------------------------------------- */
+        function switchMainTab(tab) {
+            const btnInv = document.getElementById('main-tab-inv');
+            const btnOver = document.getElementById('main-tab-over');
+            const appInv = document.getElementById('app-inventory');
+            const appOver = document.getElementById('app-overview');
+
+            if (tab === 'inventory') {
+                appInv.classList.remove('hidden');
+                appOver.classList.add('hidden');
+                btnInv.className = "px-6 py-2 rounded-full bg-blue-600 text-white font-bold transition-all shadow-lg";
+                btnOver.className = "px-6 py-2 rounded-full bg-gray-700 text-gray-300 font-bold transition-all hover:bg-gray-600";
+            } else {
+                appInv.classList.add('hidden');
+                appOver.classList.remove('hidden');
+                btnOver.className = "px-6 py-2 rounded-full bg-blue-600 text-white font-bold transition-all shadow-lg";
+                btnInv.className = "px-6 py-2 rounded-full bg-gray-700 text-gray-300 font-bold transition-all hover:bg-gray-600";
+            }
+        }
+
+        /* ========================================================================== */
+        /* App 1: 手機盤點 JS 邏輯                          */
+        /* ========================================================================== */
+        const DEFAULT_API = "https://script.google.com/macros/s/AKfycbxVckmqcb0HYPzqiTUrmXS4_Zc0NDXhXTCik-oaLx5s1soPkuFDxu8UoVsfjiUVyDdG/exec";
+        const DEFAULT_UNITS = [];
+        
+        let rawData = [];
+        let availableUnits = []; 
+        let currentTab = 'all';
+        let searchQueryInv = '';
+        let cloudInitialMap = {};
+        let employeeData = []; 
+
+        let canvas, ctx;
+        let isDrawing = false;
+        let currentSignTarget = null; 
+
+        async function fetchEmployeeData() {
+            const sheetUrl = "https://docs.google.com/spreadsheets/d/17DSL6gnK3v4GvA8xCRZ82Dzg9tXQx4yVRJfIpDhSWMs/gviz/tq?tqx=out:csv&sheet=信箱";
+            try {
+                const res = await fetch(sheetUrl);
+                let text = await res.text();
+                if (text.trim().startsWith('<!DOCTYPE html>') || text.trim().startsWith('<html')) {
+                    console.error("❌ 抓取失敗：讀取到網頁原始碼，請檢查 Google Sheet 權限是否設為「知道連結的人皆可查看」。");
+                    showMessage("系統提示", "無法讀取分機表，請確認 Google Sheet 權限！", null, true);
+                    return;
+                }
+                employeeData = parseCSV(text);
+            } catch (e) { console.warn("無法取得員工分機資料", e); }
+        }
+
+        function parseCSV(text) {
+            text = text.replace(/^\uFEFF/, ''); 
+            let rows = []; let row = []; let curr = ''; let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                if (c === '"' && text[i+1] === '"') { curr += '"'; i++; } 
+                else if (c === '"') { inQuotes = !inQuotes; } 
+                else if (c === ',' && !inQuotes) { row.push(curr.trim()); curr = ''; } 
+                else if (c === '\n' && !inQuotes) { row.push(curr.trim()); rows.push(row); row = []; curr = ''; } 
+                else if (c !== '\r') { curr += c; }
+            }
+            if (curr !== '' || text[text.length-1] === ',') row.push(curr.trim());
+            if (row.length > 0) rows.push(row);
+            if (rows.length < 2) return [];
+            const headers = rows[0]; const data = [];
+            for (let i = 1; i < rows.length; i++) {
+                let obj = { _raw: rows[i] };
+                for (let j = 0; j < headers.length; j++) { if (headers[j]) obj[headers[j]] = rows[i][j]; }
+                data.push(obj);
+            }
+            return data;
+        }
+
+        function initApiUrl() {
+            const savedUrl = localStorage.getItem('inventory_api_url');
+            document.getElementById('api-url-input').value = savedUrl ? savedUrl : DEFAULT_API;
+        }
+        function getApiUrl() {
+            let url = document.getElementById('api-url-input').value.trim();
+            return url ? url : DEFAULT_API;
+        }
+        function saveApiUrl() {
+            const url = document.getElementById('api-url-input').value.trim();
+            if(url) localStorage.setItem('inventory_api_url', url);
+        }
+        function resetApiUrl() {
+            document.getElementById('api-url-input').value = DEFAULT_API;
+            localStorage.removeItem('inventory_api_url');
+            showMessage('系統訊息', '已恢復預設網址，請重新整理。', () => location.reload());
+        }
+        function toggleSettings() {
+            document.getElementById('settings-area').classList.toggle('open');
+            document.getElementById('settings-arrow').classList.toggle('rotate-180');
+        }
+
+        function getDefaultStatus(id) {
+            return (id.startsWith('C') || id.startsWith('O')) ? '機櫃' : '未盤點';
+        }
+
+        async function fetchData() {
+            document.getElementById('inv-loading-overlay').style.display = 'flex';
+            document.getElementById('inv-loading-text').innerText = '同步雲端資料中...';
+            try {
+                const API = getApiUrl();
+                const res = await fetch(`${API}?t=${Date.now()}`);
+                if(!res.ok) throw new Error("Network response was not ok");
+                const data = await res.json();
+                const localRegistrars = {};
+                rawData.forEach(p => { if(p.registrar) localRegistrars[p.id] = p.registrar; });
+
+                if (Array.isArray(data)) {
+                    rawData = data; availableUnits = DEFAULT_UNITS;
+                } else {
+                    rawData = data.inventory || [];
+                    const cloudUnits = data.units || [];
+                    availableUnits = Array.from(new Set([...DEFAULT_UNITS, ...cloudUnits]));
+                }
+                
+                cloudInitialMap = {};
+                rawData.forEach(p => {
+                    delete p._isInventoried; 
+                    delete p._dataChanged; 
+                    
+                    if (!p.borrow_unit || p.borrow_unit.trim() === '' || p.borrow_unit.trim() === '未盤點') {
+                        p.borrow_unit = getDefaultStatus(p.id);
+                    }
+                    
+                    if (p.borrow_unit === '歸還') { 
+                        p.borrow_unit = getDefaultStatus(p.id); 
+                        delete p.return_user; 
+                        delete p.registrar; 
+                    }
+                    cloudInitialMap[p.id] = p.borrow_unit.trim();
+                    if (!p.registrar && localRegistrars[p.id]) { p.registrar = localRegistrars[p.id]; }
+                });
+                renderInv();
+            } catch (e) { 
+                document.getElementById('inv-loading-overlay').style.display = 'none';
+                showMessage('讀取失敗', `無法讀取資料，請檢查網址或網路。\n(${e.message})`, () => {
+                    document.getElementById('settings-area').classList.add('open');
+                }, true);
+                return;
+            }
+            document.getElementById('inv-loading-overlay').style.display = 'none';
+        }
+
+        function initCanvas() {
+            canvas = document.getElementById('sig-canvas'); ctx = canvas.getContext('2d');
+            ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = '#000';
+            canvas.addEventListener('mousedown', startDrawing); canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing); canvas.addEventListener('mouseout', stopDrawing);
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e.touches[0]); });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e.touches[0]); });
+            canvas.addEventListener('touchend', (e) => { e.preventDefault(); stopDrawing(); });
+        }
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
+        function startDrawing(e) { isDrawing = true; const pos = getPos(e); ctx.beginPath(); ctx.moveTo(pos.x, pos.y); }
+        function draw(e) { if (!isDrawing) return; const pos = getPos(e); ctx.lineTo(pos.x, pos.y); ctx.stroke(); }
+        function stopDrawing() { isDrawing = false; }
+        function clearSignature() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+        function resizeSignatureCanvas() {
+            if (canvas.offsetWidth === 0) return;
+            canvas.width = canvas.offsetWidth; canvas.height = canvas.offsetHeight;
+            ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = '#000';
+        }
+        function openSignatureModal() {
+            document.getElementById('signature-modal').classList.remove('hidden');
+            setTimeout(() => { resizeSignatureCanvas(); clearSignature(); }, 50);
+        }
+        function triggerSign(id) {
+            const p = rawData.find(x => x.id === id);
+            const inputEl = document.getElementById(`ext-input-${id}`);
+            const ext = inputEl ? inputEl.value.trim() : (p.extension || '').trim();
+            if (!ext) return showMessage("提醒", "請先輸入分機號碼再進行簽名！", null, true);
+            setExtensionAndSign(id, ext);
+        }
+        function setUnit(id, unit) {
+            if (!unit) return; 
+            const isReturn = ["未盤點", "機櫃", "中班", "歸還"].includes(unit);
+            if (!isReturn) { updateLocalData(id, unit, null); currentSignTarget = { id: id, unit: unit }; openSignatureModal(); } 
+            else { updateLocalData(id, unit, null); }
+        }
+        function setExtensionAndSign(id, ext) {
+            if (!ext) return; 
+            const p = rawData.find(x => x.id === id); p.extension = ext;
+            let emp = null;
+            if (employeeData && employeeData.length > 0) {
+                emp = employeeData.find(e => {
+                    if (e._raw && e._raw[5] && e._raw[5].toString().trim() === ext.trim()) return true;
+                    for (let key in e) {
+                        if (key === '_raw') continue;
+                        if (key && (key.includes('分機') || key.toLowerCase().includes('ext') || key.includes('電話')) && e[key] && e[key].toString().trim() === ext.trim()) return true;
+                    }
+                    return false;
+                });
+            }
+            let currentUnit = p.borrow_unit;
+            if (emp) {
+                let rawName = '';
+                if (emp._raw && emp._raw[4]) rawName = emp._raw[4].toString().trim();
+                if (!rawName) {
+                    let bestMatchScore = -1;
+                    const nameKeywords = [ { kw: '姓名', score: 10 }, { kw: '中文', score: 9 }, { kw: '名稱', score: 8 }, { kw: 'name', score: 7 }, { kw: '員工', score: 6 }, { kw: '人員', score: 5 }, { kw: '使用者', score: 4 }, { kw: 'user', score: 3 }, { kw: 'account', score: 2 } ];
+                    for (let key in emp) {
+                        if (key === '_raw') continue;
+                        let kLower = key.toLowerCase(); let val = emp[key] != null ? String(emp[key]).trim() : '';
+                        if (val === '') continue;
+                        for (let item of nameKeywords) {
+                            if (kLower.includes(item.kw) && item.score > bestMatchScore) { rawName = val; bestMatchScore = item.score; }
+                        }
+                    }
+                }
+                if (rawName !== '') {
+                    let cleanName = rawName.split(' ')[0].replace(/(先生|小姐|經理|主任|組長|副理|處長|工程師|管理師|專員|高專).*$/, '').trim();
+                    p.borrower = cleanName !== '' ? cleanName : rawName;
+                } else { p.borrower = ""; }
+
+                let dept = ''; let group = '';
+                if (emp._raw && emp._raw[2]) dept = emp._raw[2].toString().trim();
+                if (!dept) {
+                    for (let key in emp) {
+                        if (key === '_raw') continue;
+                        let kLower = key.toLowerCase();
+                        if (kLower === '部門' || kLower.includes('部門') || kLower.includes('dept')) dept = emp[key];
+                        if (kLower === '組' || kLower.includes('組別') || kLower.includes('group')) group = emp[key];
+                    }
+                }
+                let targetUnit = dept;
+                if (targetUnit) { currentUnit = targetUnit; } 
+                else { if (!currentUnit || currentUnit === "未盤點" || currentUnit === "機櫃" || currentUnit === "中班") currentUnit = "出借"; }
+
+                p.borrow_unit = currentUnit; renderInv(); 
+                currentSignTarget = { id: id, unit: currentUnit }; openSignatureModal();
+            } else {
+                p.borrower = "查無資訊";
+                if (!currentUnit || currentUnit === "未盤點" || currentUnit === "機櫃" || currentUnit === "中班") currentUnit = "出借";
+                p.borrow_unit = currentUnit; renderInv(); 
+                showMessage("查無資訊", `分機號碼 ${ext} 查無對應的人員資料！\n請確認分機是否輸入錯誤。`, () => {
+                    currentSignTarget = { id: id, unit: currentUnit }; openSignatureModal();
+                }, true);
+            }
+        }
+        function confirmSignature() {
+            const base64 = canvas.toDataURL('image/png');
+            if(currentSignTarget) updateLocalData(currentSignTarget.id, currentSignTarget.unit, base64);
+            closeSignatureModal(true);
+        }
+        function closeSignatureModal(saved) {
+            document.getElementById('signature-modal').classList.add('hidden');
+            if (!saved && currentSignTarget) updateLocalData(currentSignTarget.id, getDefaultStatus(currentSignTarget.id), null);
+            currentSignTarget = null;
+        }
+        function updateLocalData(id, unit, signature, returnUser) {
+            const p = rawData.find(x => x.id === id);
+            p.borrow_unit = unit || "出借";
+            if(signature) { p.signature = signature; p._dataChanged = true; } 
+            else if (unit === "機櫃" || unit === "中班" || unit === "歸還") delete p.signature;
+            if(returnUser) { p.return_user = returnUser; p._dataChanged = true; } 
+            else delete p.return_user;
+            renderInv();
+        }
+        function updateDetail(id, field, value) { 
+            const p = rawData.find(x => x.id === id); 
+            p[field] = value; 
+            p._dataChanged = true; 
+        }
+        function triggerReturn(id) {
+            const p = rawData.find(x => x.id === id);
+            const hasExtension = p.extension && p.extension.trim() !== '';
+            const hasBorrower = p.borrower && p.borrower.trim() !== '';
+            const hasUnit = p.borrow_unit && p.borrow_unit.trim() !== '' && p.borrow_unit !== '出借';
+            if (!hasExtension || !hasBorrower || !hasUnit) return showMessage("無法歸還", "此手機的出借資料（分機、借用人、出借單位）不完整！\n請先填入分機帶入資料，或手動補齊資訊後，再執行歸還操作。", null, true);
+            p._isReturning = true; 
+            renderInv();
+            setTimeout(() => { const input = document.getElementById(`return-input-${id}`); if(input) input.focus(); }, 100);
+        }
+        function cancelReturn(id) { 
+            const p = rawData.find(x => x.id === id); 
+            delete p._isReturning; 
+            renderInv(); 
+        }
+        function confirmReturn(id) {
+            const input = document.getElementById(`return-input-${id}`); const val = input.value.trim();
+            if(!val) return showMessage("提醒", "請輸入確認人員姓名！", null, true);
+            const p = rawData.find(x => x.id === id); delete p._isReturning;
+            delete p.borrower; delete p.extension; delete p.charger; delete p.lender; delete p.signature;
+            updateLocalData(id, "歸還", null, val);
+        }
+        function handleSearch(val) {
+            searchQueryInv = val.trim().toLowerCase();
+            const clearBtn = document.getElementById('clear-search');
+            if (searchQueryInv) clearBtn.classList.remove('hidden'); else clearBtn.classList.add('hidden');
+            renderInv();
+        }
+        function clearSearch() {
+            document.getElementById('inv-search-input').value = ''; searchQueryInv = '';
+            document.getElementById('clear-search').classList.add('hidden'); renderInv();
+        }
+        function checkMissingPeople() {
+            const TEAM_MEMBERS = [ "許昕慈", "簡伶珊", "許庭瑊", "彭毓雯", "王溶蓁", "秦嘉佑", "郭冠麟", "江冠錡", "李敏瑞", "呂孟軒", "穆道生", "林敏雄", "林榆昕", "洪全緯", "蔡曜宇", "王雯鈺", "周啟堂", "宋灝平" ];
+            const registeredUsers = new Set();
+            rawData.forEach(p => { if (p.registrar && (p.borrow_unit === '機櫃' || p.borrow_unit === '中班')) registeredUsers.add(p.registrar); });
+            const missingUsers = TEAM_MEMBERS.filter(name => !registeredUsers.has(name));
+            if (missingUsers.length === 0) showMessage("抓漏結果", "🎉 太棒了！所有組員都已經在暫存區登錄過了！");
+            else { const msg = `⚠️ 以下人員尚未進行盤點暫存：\n\n${missingUsers.map(u => `• ${u}`).join('\n')}\n\n請盡快提醒他們開啟系統完成盤點！`; showMessage("尚未登錄人員名單", msg, null, true); }
+        }
+
+        function renderInv() {
+            const container = document.getElementById('grid-container'); const missingContainer = document.getElementById('missing-tags');
+            const noResultEl = document.getElementById('no-result'); let missingIds = []; container.innerHTML = ''; missingContainer.innerHTML = '';
+            let shownCount = 0;
+
+            rawData.forEach(p => {
+                const id = p.id; 
+                const unit = (p.borrow_unit || getDefaultStatus(id)).trim(); 
+                let status = 'neutral';
+                
+                if (unit === '機櫃') status = 'cabinet'; else if (unit === '中班') status = 'mid'; else if (unit === '歸還') status = 'returned'; else if (unit !== '未盤點') status = 'borrowed';
+                if (status === 'neutral' || unit === '出借') missingIds.push(id);
+                let isTabShow = (currentTab === 'all') || (currentTab === 'un' && (status === 'neutral' || unit === '出借')) || (id.startsWith(currentTab));
+                let isSearchShow = !searchQueryInv || id.toLowerCase().includes(searchQueryInv) || (p.model && p.model.toLowerCase().includes(searchQueryInv));
+
+                if(isTabShow && isSearchShow) {
+                    shownCount++; const card = document.createElement('div');
+                    let borderClass = 'border-gray-100 shadow-sm'; let bgClass = 'bg-white';
+                    if (status === 'cabinet') { borderClass = 'border-green-400'; bgClass = 'bg-green-50/20'; }
+                    else if (status === 'mid') { borderClass = 'border-amber-400'; bgClass = 'bg-amber-50/20'; }
+                    else if (status === 'borrowed') { borderClass = 'border-blue-400'; bgClass = 'bg-blue-50/20'; }
+                    else if (status === 'returned') { borderClass = 'border-purple-400'; bgClass = 'bg-purple-50/20'; }
+                    card.className = `p-4 rounded-xl border-2 transition-all ${borderClass} ${bgClass}`; card.id = `card-${id}`;
+                    
+                    let sigBadge = p.signature ? '<span class="ml-1 text-[10px] text-green-600 border border-green-600 px-1 rounded"><i class="fas fa-check"></i> 已簽名</span>' : '';
+                    let returnBadge = (status === 'returned') ? `<span class="ml-1 text-[10px] text-purple-600 border border-purple-600 px-1 rounded"><i class="fas fa-undo"></i> 歸還: ${p.return_user}</span>` : '';
+                    let cardContent = '';
+                    if (p._isReturning) {
+                        cardContent = `
+                            <div class="mb-2">
+                                <label class="text-xs font-bold text-gray-500">歸還確認人員：</label>
+                                <div class="flex gap-2 mt-1">
+                                    <input type="text" id="return-input-${id}" class="flex-1 min-w-0 p-2 border rounded text-sm" placeholder="輸入姓名">
+                                    <button onclick="confirmReturn('${id}')" class="shrink-0 bg-purple-600 text-white px-3 rounded text-xs">確認</button>
+                                    <button onclick="cancelReturn('${id}')" class="shrink-0 bg-gray-300 text-gray-700 px-2 rounded text-xs"><i class="fas fa-times"></i></button>
+                                </div>
+                            </div>`;
+                    } else {
+                        let returnBtn = (status === 'borrowed') ? `<button onclick="triggerReturn('${id}')" class="flex-1 py-2 text-xs border border-purple-300 text-purple-600 bg-white hover:bg-purple-50 rounded-lg transition-colors font-bold"><i class="fas fa-undo mr-1"></i>歸還</button>` : '';
+                        let detailInputs = '';
+                        if (status === 'borrowed') {
+                            detailInputs = `
+                                <div class="mt-2 pt-2 border-t border-blue-200 w-full overflow-hidden">
+                                    <div class="mb-2">
+                                        <label class="block text-[10px] text-gray-500 font-bold mb-0.5">借用人</label>
+                                        <input type="text" value="${p.borrower || ''}" oninput="updateDetail('${id}', 'borrower', this.value)" class="detail-input min-w-0 w-full" placeholder="自動帶入">
+                                    </div>
+                                    <div class="flex gap-2 mb-2 w-full">
+                                        <div class="flex-1 min-w-0">
+                                            <label class="block text-[10px] text-gray-500 font-bold mb-0.5 truncate">出借單位</label>
+                                            <input type="text" value="${unit !== '出借' ? unit : ''}" oninput="updateDetail('${id}', 'borrow_unit', this.value)" class="detail-input bg-white min-w-0 w-full" placeholder="自動帶入">
+                                        </div>
+                                        <div class="flex-1 min-w-0">
+                                            <label class="block text-[10px] text-gray-500 font-bold mb-0.5 truncate">出借人員</label>
+                                            <select oninput="updateDetail('${id}', 'lender', this.value)" class="detail-input min-w-0 w-full bg-white">
+                                                <option value="">-- 請選擇出借人 --</option>
+                                                ${overviewState.staffData.map(name => `<option value="${name}" ${(p.lender || '') === name ? 'selected' : ''}>${name}</option>`).join('')}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center text-xs mt-1">
+                                        <span class="mr-2 text-gray-600 font-bold whitespace-nowrap">借充電器材?</span>
+                                        <label class="mr-2 whitespace-nowrap"><input type="radio" name="charger-${id}" value="有" ${p.charger === '有' ? 'checked' : ''} onclick="updateDetail('${id}', 'charger', '有')"> 有</label>
+                                        <label class="whitespace-nowrap"><input type="radio" name="charger-${id}" value="無" ${p.charger === '無' || !p.charger ? 'checked' : ''} onclick="updateDetail('${id}', 'charger', '無')"> 無</label>
+                                    </div>
+                                </div>`;
+                        }
+                        cardContent = `
+                            <div class="flex gap-1 mb-2 w-full">
+                                <button onclick="setStatus('${id}', '機櫃')" class="flex-1 min-w-0 py-2 text-xs border rounded-lg transition-colors ${status==='cabinet'?'bg-green-500 text-white font-bold border-green-600':'bg-white text-gray-400 hover:bg-gray-50'}">機櫃</button>
+                                <button onclick="setStatus('${id}', '中班')" class="flex-1 min-w-0 py-2 text-xs border rounded-lg transition-colors ${status==='mid'?'bg-amber-500 text-white font-bold border-amber-600':'bg-white text-gray-400 hover:bg-gray-50'}">中班</button>
+                                <button onclick="setStatus('${id}', '出借')" class="flex-1 min-w-0 py-2 text-xs border rounded-lg transition-colors ${status==='borrowed'?'bg-blue-500 text-white font-bold border-blue-600':'bg-white text-gray-400 hover:bg-gray-50'}">出借</button>
+                            </div>
+                            ${returnBtn ? `<div class="mb-2 flex w-full">${returnBtn}</div>` : ''}
+                            <div class="flex gap-2 items-center w-full ${status==='borrowed'?'':'hidden'}">
+                                <input type="text" id="ext-input-${id}" placeholder="-- 必填分機 --" value="${p.extension || ''}" oninput="updateDetail('${id}', 'extension', this.value)" class="flex-1 min-w-0 p-2 text-xs border rounded-lg bg-white outline-none focus:ring-2 focus:ring-blue-400">
+                                <button onclick="triggerSign('${id}')" class="shrink-0 bg-blue-600 text-white px-3 py-2 rounded-lg text-xs font-bold shadow hover:bg-blue-700 whitespace-nowrap"><i class="fas fa-pen-nib mr-1"></i>簽名</button>
+                            </div>
+                            ${detailInputs}`;
+                    }
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="text-xl font-black font-mono tracking-tight">${id}</span>
+                            <div class="flex flex-col items-end">
+                                <span class="text-[10px] bg-gray-100 px-1.5 py-0.5 rounded text-gray-500 font-medium mb-1">${p.model}</span>
+                                ${sigBadge}
+                                ${returnBadge}
+                            </div>
+                        </div>
+                        ${cardContent}`;
+                    container.appendChild(card);
+                }
+            });
+
+            if (shownCount === 0) noResultEl.classList.remove('hidden'); else noResultEl.classList.add('hidden');
+            document.getElementById('total-count').innerText = rawData.length;
+            missingIds.forEach(mid => {
+                const span = document.createElement('span');
+                span.className = "missing-tag bg-red-50 text-red-600 px-2 py-1 rounded-md text-[11px] font-mono font-bold border border-red-200 cursor-pointer";
+                span.innerText = mid;
+                span.onclick = () => {
+                    const target = document.getElementById(`card-${mid}`);
+                    if(target) { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); target.classList.add('ring-4', 'ring-red-300'); setTimeout(() => target.classList.remove('ring-4', 'ring-red-300'), 2000); } 
+                    else { clearSearch(); switchInvTab('all', document.querySelector('.tab-btn')); setTimeout(() => { const t = document.getElementById(`card-${mid}`); if(t) t.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 300); }
+                };
+                missingContainer.appendChild(span);
+            });
+        }
+
+        function setStatus(id, s) {
+            const p = rawData.find(x => x.id === id);
+            const defStatus = getDefaultStatus(id);
+            
+            const wasReturned = p.borrow_unit === '歸還';
+            
+            if (s === '機櫃' || s === '中班') { 
+                delete p.signature; delete p._isReturning; delete p.borrower; delete p.extension; delete p.charger; delete p.lender; 
+                p._isInventoried = true; 
+            } else {
+                delete p._isInventoried;
+            }
+            
+            if (p.borrow_unit === s || (s === '出借' && !["未盤點", "機櫃", "中班", "歸還"].includes(p.borrow_unit))) {
+                p.borrow_unit = defStatus; 
+                delete p._isInventoried; 
+            } else {
+                p.borrow_unit = s; 
+            }
+            
+            if (p.borrow_unit !== '歸還' && !(wasReturned && (s === '機櫃' || s === '中班'))) {
+                delete p.return_user;
+            }
+            renderInv();
+        }
+        
+        function switchInvTab(t, b) {
+            currentTab = t;
+            document.querySelectorAll('#app-inventory .tab-btn').forEach(x => { x.classList.remove('tab-active'); x.classList.add('text-gray-500'); });
+            b.classList.add('tab-active'); b.classList.remove('text-gray-500');
+            renderInv();
+        }
+        
+        function validate() {
+            const invalid = rawData.filter(p => { const isBorrowed = !["未盤點", "機櫃", "中班", "歸還"].includes(p.borrow_unit); return isBorrowed && (!p.extension || p.extension.trim() === ""); });
+            if(invalid.length > 0) { showMessage("資料錯誤", `以下手機已選「出借」，但未填寫「分機」：\n${invalid.map(x=>x.id).join(', ')}`, null, true); return false; }
+            return true;
+        }
+
+        async function openTempModal() {
+            if(!validate()) return;
+            
+            const localChanges = rawData.filter(p => p.borrow_unit !== cloudInitialMap[p.id] || p._isInventoried || p._dataChanged);
+            if(localChanges.length === 0) return showMessage('提示', "資料與雲端一致，無需暫存。");
+
+            const loadingOverlay = document.getElementById('inv-loading-overlay'); const loadingText = document.getElementById('inv-loading-text');
+            loadingOverlay.style.display = 'flex'; loadingText.innerText = '正在檢查雲端資料衝突...';
+            try {
+                const API = getApiUrl(); const res = await fetch(`${API}?t=${Date.now()}`);
+                if(!res.ok) throw new Error("Network error");
+                const data = await res.json(); let freshData = Array.isArray(data) ? data : (data.inventory || []);
+                
+                const freshMap = {}; 
+                freshData.forEach(p => {
+                    let fUnit = (p.borrow_unit || '').trim();
+                    if (fUnit === '' || fUnit === '未盤點') fUnit = getDefaultStatus(p.id);
+                    freshMap[p.id] = fUnit;
+                });
+                
+                const conflicts = [];
+                localChanges.forEach(change => {
+                    const freshStatus = freshMap[change.id]; const initialStatus = cloudInitialMap[change.id];
+                    if (freshStatus !== initialStatus && freshStatus !== getDefaultStatus(change.id) && freshStatus !== '歸還') conflicts.push(`• ${change.id} (已被變更為: ${freshStatus})`);
+                });
+                loadingOverlay.style.display = 'none';
+                if (conflicts.length > 0) return showMessage("❌ 資料衝突警告", "暫存區已有該編號(手機)資料，請再次確認！\n\n以下手機已被其他人更新：\n" + conflicts.join('\n'), null, true);
+                document.getElementById('change-preview').innerHTML = localChanges.map(c => `<div class="py-1 border-b flex justify-between"><span>${c.id}</span><span>${cloudInitialMap[c.id]} -> <b class="text-amber-600">${c.borrow_unit}</b></span></div>`).join('');
+                document.getElementById('temp-modal').classList.remove('hidden');
+            } catch(e) { loadingOverlay.style.display = 'none'; showMessage('檢查失敗', "無法連接雲端檢查衝突(網路錯誤)。" + e.message, null, true); }
+        }
+        
+        function closeInvModal(id) { document.getElementById(id).classList.add('hidden'); }
+        
+        async function confirmSave() {
+            const name = document.getElementById('registrar-name').value.trim();
+            if(!name) return showMessage('錯誤', "請選擇登記姓名！", null, true);
+            const btn = document.getElementById('save-btn'); btn.disabled = true; btn.innerText = "儲存中...";
+            document.getElementById('inv-loading-overlay').style.display = 'flex'; document.getElementById('inv-loading-text').innerText = '正在寫入暫存區...';
+            
+            const inventory = rawData.filter(p => p.borrow_unit !== cloudInitialMap[p.id] || p._isInventoried || p._dataChanged).map(p => ({ id: p.id, status: p.borrow_unit, signature: p.signature, return_user: p.return_user, borrower: p.borrower, extension: p.extension, charger: p.charger, lender: p.lender }));
+            
+            try {
+                const API = getApiUrl();
+                const fetchPromise = fetch(API, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: "temp_save", registrar: name, inventory: inventory }) });
+                const timeoutPromise = new Promise(resolve => setTimeout(resolve, 3000));
+                await Promise.race([fetchPromise, timeoutPromise]);
+                document.getElementById('inv-loading-overlay').style.display = 'none';
+                
+                inventory.forEach(item => { 
+                    cloudInitialMap[item.id] = item.status; 
+                    const p = rawData.find(x => x.id === item.id); 
+                    if(p) { 
+                        p.registrar = name; 
+                        delete p._isInventoried; 
+                        delete p._dataChanged; 
+                    } 
+                });
+                
+                closeInvModal('temp-modal'); btn.disabled = false; btn.innerText = "確認儲存"; showMessage("成功", "暫存成功！\n資料已同步至後端。");
+            } catch(e) { 
+                document.getElementById('inv-loading-overlay').style.display = 'none';
+                showMessage('錯誤', "寫入失敗(網路錯誤)：" + e, null, true); btn.disabled = false; btn.innerText = "確認儲存"; 
+            }
+        }
+        
+        function trySubmitFinal() {
+            if(!validate()) return;
+            const uninventoried = rawData.filter(p => !p.borrow_unit || p.borrow_unit === "未盤點");
+            if (uninventoried.length > 0) {
+                let idList = uninventoried.map(p => p.id).join(', '); let displayList = idList;
+                if (idList.length > 150) displayList = idList.substring(0, 150) + "...等共 " + uninventoried.length + " 筆";
+                return showMessage("無法上傳", `⚠️ 尚有 ${uninventoried.length} 筆手機未盤點！\n\n請確認以下手機狀態後再進行正式上傳：\n${displayList}`, null, true);
+            }
+            document.getElementById('submit-modal').classList.remove('hidden');
+        }
+        function confirmSubmitFinal() {
+            const name = document.getElementById('submit-main-user').value;
+            if(!name) return showMessage("錯誤", "請選取「正式上傳的主責盤點人員」！", null, true);
+            document.getElementById('submit-modal').classList.add('hidden'); executeFinalSubmit(name);
+        }
+        async function executeFinalSubmit(name) {
+            const btn = document.getElementById('submit-btn'); btn.disabled = true;
+            const loadingOverlay = document.getElementById('inv-loading-overlay'); loadingOverlay.style.display = 'flex'; document.getElementById('inv-loading-text').innerText = '正在正式上傳資料，請稍後...';
+            const inventory = rawData.map(p => ({ id: p.id, status: p.borrow_unit, signature: p.signature, return_user: p.return_user, borrower: p.borrower, extension: p.extension, charger: p.charger, lender: p.lender }));
+            try {
+                const API = getApiUrl();
+                const fetchPromise = fetch(API, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ action: "submit", registrar: name, inventory: inventory }) });
+                
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("請求超時，請檢查網路連線")), 15000));
+                await Promise.race([fetchPromise, timeoutPromise]);
+                
+                loadingOverlay.style.display = 'none'; showMessage("上傳成功", "🎉 請求已發送！\n系統將自動重整以讀取最新雲端狀態。", () => location.reload());
+            } catch(e) { loadingOverlay.style.display = 'none'; showMessage("上傳失敗", "提交過程發生錯誤：" + e.message, null, true); btn.disabled = false; }
+        }
+        function showMessage(title, message, callback = null, isError = false) {
+            const modal = document.getElementById('system-modal');
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-message').innerText = message;
+            document.getElementById('modal-actions').innerHTML = `<button id="modal-ok-btn" class="flex-1 py-2 rounded-lg text-white font-bold shadow bg-blue-600 hover:bg-blue-700">確定</button>`;
+            document.getElementById('modal-ok-btn').onclick = () => { modal.classList.add('hidden'); if(callback) callback(); };
+            modal.classList.remove('hidden');
+        }
+
+        /* ========================================================================== */
+        /* App 2: 狀態總覽 JS 邏輯                          */
+        /* ========================================================================== */
+        const WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxVckmqcb0HYPzqiTUrmXS4_Zc0NDXhXTCik-oaLx5s1soPkuFDxu8UoVsfjiUVyDdG/exec'; 
+        const SHEET_ID = '1LsuBSpaKrnXN6GKM-6AFMbA9T286_TK3u9sQ9bzl2Pc';
+        const URL_DEVICES = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent('手機清單')}&tq=${encodeURIComponent('SELECT A, B, D')}`; 
+        const URL_LOANS = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent('出借單位')}&tq=${encodeURIComponent('SELECT A, B, C, E, H')}`;
+        const URL_STAFF = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=2025830320&tq=${encodeURIComponent('SELECT A')}`;
+
+        let overviewState = {
+            devicesData: [], loansData: [], staffData: [], searchQuery: '', filterType: 'all',
+            isSyncing: false, autoSyncEnabled: false, autoSyncInterval: 5, secondsUntilNextSync: 300,
+            countdownId: null, currentEditId: null
+        };
+
+        async function fetchSheetData(url) {
+            const res = await fetch(url); const text = await res.text();
+            const start = text.indexOf('{'); const end = text.lastIndexOf('}');
+            if (start === -1 || end === -1) throw new Error("無效的資料格式");
+            const json = JSON.parse(text.substring(start, end + 1));
+            return json.table.rows.map(row => {
+                return row.c.map(cell => {
+                    if (!cell) return ''; if (cell.f !== undefined && cell.f !== null) return String(cell.f); if (cell.v !== undefined && cell.v !== null) return String(cell.v); return '';
+                });
+            });
+        }
+
+        async function syncOverviewData() {
+            if (overviewState.isSyncing) return;
+            const btn = document.getElementById('btn-sync-now'); const icon = document.getElementById('sync-icon'); const statusText = document.getElementById('sync-status');
+            overviewState.isSyncing = true;
+            if(icon) icon.classList.add('animate-spin'); if(btn) btn.disabled = true;
+            try {
+                const [devicesData, loansData, staffDataRaw] = await Promise.all([ fetchSheetData(URL_DEVICES), fetchSheetData(URL_LOANS), fetchSheetData(URL_STAFF) ]);
+                overviewState.devicesData = devicesData; overviewState.loansData = loansData;
+                overviewState.staffData = staffDataRaw.map(cols => cols[0] ? String(cols[0]).trim() : '').filter(name => name !== '' && !name.includes('清單') && name !== '姓名' && name !== '同仁');
+                renderStaffOptions();
+                if(statusText) statusText.innerText = `上次更新時間：${new Date().toLocaleString()}`;
+                renderOverviewTable();
+                if (overviewState.autoSyncEnabled) resetCountdown();
+            } catch (error) { console.error('Sync failed:', error); alert('同步失敗，請檢查網路或試算表權限。'); } 
+            finally { overviewState.isSyncing = false; if(icon) icon.classList.remove('animate-spin'); if(btn) btn.disabled = false; }
+        }
+
+        function renderStaffOptions() {
+            const select = document.getElementById('modal-nickname'); const currentVal = select.value;
+            select.innerHTML = '<option value="">-- 結束測試 (恢復在庫) --</option>';
+            overviewState.staffData.forEach(name => { const opt = document.createElement('option'); opt.value = name; opt.textContent = name; select.appendChild(opt); });
+            if (overviewState.staffData.includes(currentVal)) select.value = currentVal;
+        }
+
+        function toggleAutoSync() {
+            overviewState.autoSyncEnabled = document.getElementById('auto-sync-toggle').checked;
+            const optionsArea = document.getElementById('auto-sync-options');
+            if (overviewState.autoSyncEnabled) { optionsArea.classList.remove('opacity-50', 'pointer-events-none'); startAutoSyncTimer(); } 
+            else { optionsArea.classList.add('opacity-50', 'pointer-events-none'); stopAutoSyncTimer(); document.getElementById('next-sync-counter').innerText = '(未啟用自動同步)'; }
+        }
+        function updateSyncInterval() {
+            let val = parseInt(document.getElementById('sync-interval-input').value); overviewState.autoSyncInterval = (isNaN(val) || val < 1) ? 1 : val;
+            if (overviewState.autoSyncEnabled) startAutoSyncTimer();
+        }
+        function startAutoSyncTimer() {
+            stopAutoSyncTimer(); resetCountdown();
+            overviewState.countdownId = setInterval(() => { overviewState.secondsUntilNextSync--; if (overviewState.secondsUntilNextSync <= 0) syncOverviewData(); else updateCountdownDisplay(); }, 1000);
+        }
+        function stopAutoSyncTimer() { if (overviewState.countdownId) clearInterval(overviewState.countdownId); }
+        function resetCountdown() { overviewState.secondsUntilNextSync = overviewState.autoSyncInterval * 60; updateCountdownDisplay(); }
+        function updateCountdownDisplay() {
+            const min = Math.floor(overviewState.secondsUntilNextSync / 60); const sec = overviewState.secondsUntilNextSync % 60;
+            document.getElementById('next-sync-counter').innerText = `下次同步倒數：${min}分${sec}秒`;
+        }
+
+        function switchOverviewInnerTab(tab) {
+            document.getElementById('view-overview').classList.toggle('hidden', tab !== 'overview');
+            document.getElementById('view-update').classList.toggle('hidden', tab !== 'update');
+            const activeBtnClass = 'px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 bg-blue-50 text-blue-700';
+            const inactiveBtnClass = 'px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 text-slate-600 hover:bg-slate-50';
+            document.getElementById('btn-tab-overview').className = tab === 'overview' ? activeBtnClass : inactiveBtnClass;
+            document.getElementById('btn-tab-update').className = tab === 'update' ? activeBtnClass : inactiveBtnClass;
+        }
+
+        function setFilter(type) {
+            overviewState.filterType = type;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                const isMatch = btn.getAttribute('data-filter') === type;
+                if (type === 'all' && isMatch) btn.className = 'filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-slate-800 shadow-sm';
+                else if (type === 'available' && isMatch) btn.className = 'filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-emerald-600 shadow-sm';
+                else if (type === 'testing' && isMatch) btn.className = 'filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-sky-600 shadow-sm';
+                else if (type === 'borrowed' && isMatch) btn.className = 'filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors bg-white text-amber-600 shadow-sm';
+                else btn.className = 'filter-btn shrink-0 px-4 py-1.5 rounded-md text-sm font-medium transition-colors text-slate-500 hover:text-slate-700';
+            });
+            renderOverviewTable();
+        }
+
+        function openTestModal(id, model, isBorrowed, tester) {
+            if (isBorrowed) { alert('此裝置目前為「出借中」，請先歸還後再設定測試狀態。'); return; }
+            overviewState.currentEditId = id;
+            document.getElementById('modal-device-id').innerText = `# ${id}`; document.getElementById('modal-device-model').innerText = model;
+            const select = document.getElementById('modal-nickname'); const testerName = tester === '-' ? '' : tester;
+            
+            if (testerName && !overviewState.staffData.includes(testerName)) {
+                let found = Array.from(select.options).some(opt => opt.value === testerName);
+                if (!found) { const opt = document.createElement('option'); opt.value = testerName; opt.textContent = testerName + ' (舊紀錄)'; select.appendChild(opt); }
+            }
+            select.value = testerName;
+            
+            const btnReturn = document.getElementById('btn-return-test');
+            if (tester !== '-' && tester.trim() !== '') { btnReturn.classList.remove('hidden'); btnReturn.classList.add('flex'); } 
+            else { btnReturn.classList.add('hidden'); btnReturn.classList.remove('flex'); }
+            
+            const modal = document.getElementById('test-modal'); const content = document.getElementById('test-modal-content');
+            modal.classList.remove('hidden'); modal.classList.add('flex'); setTimeout(() => content.classList.remove('scale-95'), 10);
+        }
+
+        function closeOverviewModal() {
+            const modal = document.getElementById('test-modal'); const content = document.getElementById('test-modal-content');
+            content.classList.add('scale-95');
+            setTimeout(() => { modal.classList.add('hidden'); modal.classList.remove('flex'); overviewState.currentEditId = null; }, 150);
+        }
+        function clearAndSaveTest() { document.getElementById('modal-nickname').value = ''; saveTestStatus(); }
+
+        // 【大改版】精準查驗雲端分頁是否存在 (破解 Google API 自動降級問題)
+        async function checkInventoryCompletion() {
+            const SHEET_ID = '1LsuBSpaKrnXN6GKM-6AFMbA9T286_TK3u9sQ9bzl2Pc';
+            const today = new Date();
+            const yyyy = today.getFullYear();
+            const m = today.getMonth() + 1;
+            const d = today.getDate();
+            const mm = m.toString().padStart(2, '0');
+            const dd = d.toString().padStart(2, '0');
+
+            const formats = [`${m}/${d}`, `${mm}/${dd}`, `${m}月${d}日`, `${yyyy}-${mm}-${dd}`];
+
+            let isCompleted = false;
+            let foundFormat = '';
+
+            try {
+                // 1. 取得預設分頁(第一頁)的簽章 (Signature)
+                // Google API 的雷點：當查詢的分頁不存在時，它會自動拿第一頁的資料塞給你。
+                // 因此我們先把第一頁的專屬「簽章」抓下來，當作對照組。
+                const defaultUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&tq=${encodeURIComponent('SELECT A LIMIT 1')}&t=${Date.now()}`;
+                const defaultRes = await fetch(defaultUrl, { cache: 'no-store' });
+                const defaultText = await defaultRes.text();
+                const defaultJson = JSON.parse(defaultText.substring(defaultText.indexOf('{'), defaultText.lastIndexOf('}') + 1));
+                const defaultSig = defaultJson.sig;
+
+                // 2. 逐一檢查各種可能的今日日期格式
+                for (const format of formats) {
+                    if (isCompleted) break;
+                    try {
+                        // 加上 t=Date.now() 徹底破除瀏覽器快取
+                        const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(format)}&tq=${encodeURIComponent('SELECT A LIMIT 1')}&t=${Date.now()}`;
+                        const res = await fetch(url, { cache: 'no-store' });
+                        const text = await res.text();
+                        const start = text.indexOf('{');
+                        const end = text.lastIndexOf('}');
+                        
+                        if (start !== -1 && end !== -1) {
+                            const json = JSON.parse(text.substring(start, end + 1));
+                            // 如果成功回傳，而且簽章(sig)跟第一頁的對照組【不同】，才代表這個分頁是真的存在！
+                            if (json.status === 'ok' && json.sig !== defaultSig) {
+                                isCompleted = true;
+                                foundFormat = format;
+                            }
+                        }
+                    } catch (e) {
+                        // 略過錯誤
+                    }
+                }
+            } catch (e) {
+                console.warn('查驗盤點狀態失敗', e);
+            }
+
+            const banner = document.getElementById('completion-banner');
+            if (banner) {
+                if (isCompleted) {
+                    banner.classList.remove('hidden');
+                    banner.classList.add('flex');
+                    document.getElementById('completion-time-text').innerText = `雲端已成功建立今日盤點表 (${foundFormat})`;
+                } else {
+                    banner.classList.add('hidden');
+                    banner.classList.remove('flex');
+                }
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container'); const toast = document.createElement('div');
+            const colorClass = type === 'success' ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : type === 'error' ? 'bg-red-100 text-red-800 border-red-200' : 'bg-sky-100 text-sky-800 border-sky-200';
+            toast.className = `px-4 py-3 rounded-lg border shadow-lg text-sm font-bold flex items-center gap-2 transform transition-all duration-300 translate-y-full opacity-0 pointer-events-auto ${colorClass}`;
+            toast.innerHTML = message; container.appendChild(toast);
+            requestAnimationFrame(() => { toast.classList.remove('translate-y-full', 'opacity-0'); });
+            setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.remove(), 300); }, 3000);
+        }
+
+        async function writeToSheetWithRetry(id, nickname, maxRetries = 3) {
+            if (!WEB_APP_URL) return false;
+            const payload = JSON.stringify({ id: id, nickname: nickname });
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const response = await fetch(WEB_APP_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: payload });
+                    const result = await response.json();
+                    if (result.success) return true; else throw new Error(result.error || 'Server returned false');
+                } catch (error) {
+                    console.warn(`[API 寫入嘗試 ${attempt}/${maxRetries}] 失敗:`, error);
+                    if (attempt === maxRetries) throw error; await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+                }
+            }
+        }
+
+        async function saveTestStatus() {
+            const id = overviewState.currentEditId; const nickname = document.getElementById('modal-nickname').value.trim();
+            const originalNickname = overviewState.devicesData.find(cols => cols[0] === id)?.[2] || '';
+            if (!id) return;
+
+            const deviceIndex = overviewState.devicesData.findIndex(cols => cols[0] === id);
+            if (deviceIndex !== -1) {
+                while (overviewState.devicesData[deviceIndex].length < 3) { overviewState.devicesData[deviceIndex].push(''); }
+                overviewState.devicesData[deviceIndex][2] = nickname; 
+            }
+            renderOverviewTable(); closeOverviewModal();
+
+            if (WEB_APP_URL) {
+                showToast(`<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> 背景同步中...`, 'info'); lucide.createIcons();
+                try {
+                    await writeToSheetWithRetry(id, nickname, 3); showToast(`<i data-lucide="check-circle" class="w-4 h-4"></i> 資料寫入成功！`, 'success');
+                } catch (e) {
+                    console.error('寫入 Sheet 失敗', e); showToast(`<i data-lucide="alert-triangle" class="w-4 h-4"></i> 寫入失敗，已還原狀態`, 'error');
+                    if (deviceIndex !== -1) { overviewState.devicesData[deviceIndex][2] = originalNickname; renderOverviewTable(); }
+                }
+                lucide.createIcons();
+            } else { console.log('未設定 WEB_APP_URL，目前資料僅暫存於畫面中。'); }
+        }
+
+        function renderOverviewTable() {
+            const devices = overviewState.devicesData.map(cols => ({ id: (cols[0] || '').trim(), model: (cols[1] || '').trim(), note: (cols[2] || '').trim() })).filter(d => d.id !== '' && d.id !== '編號' && d.id !== '手機編號');
+            const loans = overviewState.loansData.map(cols => ({ id: (cols[0] || '').trim(), unit: (cols[1] || '').trim(), borrower: (cols[2] || '').trim(), loanDate: (cols[3] || '').trim(), returnDate: cols[4] !== undefined ? String(cols[4]).trim() : '' })).filter(l => l.id !== '' && l.id !== '編號' && l.id !== '手機編號');
+
+            const mergedData = devices.map(device => {
+                const activeLoan = loans.find(l => l.id === device.id && l.returnDate === ''); const isBorrowed = !!activeLoan; const isTesting = !isBorrowed && device.note !== ''; 
+                return { ...device, isBorrowed: isBorrowed, isTesting: isTesting, tester: isTesting ? device.note : '-', borrower: activeLoan ? activeLoan.borrower : '-', unit: activeLoan ? activeLoan.unit : '-', loanDate: activeLoan ? activeLoan.loanDate : '-' };
+            });
+
+            const filteredData = mergedData.filter(d => {
+                const isAvail = !d.isBorrowed && !d.isTesting;
+                const matchesFilter = overviewState.filterType === 'all' || (overviewState.filterType === 'available' && isAvail) || (overviewState.filterType === 'testing' && d.isTesting) || (overviewState.filterType === 'borrowed' && d.isBorrowed);
+                const matchesSearch = d.id.toLowerCase().includes(overviewState.searchQuery) || d.model.toLowerCase().includes(overviewState.searchQuery) || d.borrower.toLowerCase().includes(overviewState.searchQuery) || d.tester.toLowerCase().includes(overviewState.searchQuery) || d.unit.toLowerCase().includes(overviewState.searchQuery);
+                return matchesFilter && matchesSearch;
+            });
+
+            document.getElementById('stat-total').innerText = mergedData.length;
+            const borrowedCount = mergedData.filter(d => d.isBorrowed).length; const testingCount = mergedData.filter(d => d.isTesting).length;
+            document.getElementById('stat-borrowed').innerText = borrowedCount; document.getElementById('stat-testing').innerText = testingCount;
+            document.getElementById('stat-available').innerText = mergedData.length - borrowedCount - testingCount;
+
+            const groupedData = {};
+            filteredData.forEach(d => {
+                let groupName;
+                if (overviewState.filterType === 'testing') { groupName = d.tester !== '-' ? d.tester : '未知同仁'; } 
+                else { const seriesMatch = d.id.match(/^[a-zA-Z]+/); groupName = seriesMatch ? seriesMatch[0].toUpperCase() + ' 系列' : '其他'; }
+                if (!groupedData[groupName]) groupedData[groupName] = [];
+                groupedData[groupName].push(d);
+            });
+
+            const container = document.getElementById('card-container'); container.innerHTML = '';
+            if (filteredData.length === 0) { container.innerHTML = `<div class="py-12 text-center text-slate-500 italic bg-white rounded-xl border border-slate-200 shadow-sm">找不到符合條件的裝置資料</div>`; return; }
+
+            Object.keys(groupedData).sort().forEach(groupName => {
+                const seriesData = groupedData[groupName]; const section = document.createElement('div');
+                section.className = 'bg-slate-50/50 rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm';
+                const indicatorColor = overviewState.filterType === 'testing' ? 'bg-sky-500' : 'bg-blue-500';
+                const sectionHeader = `
+                    <div class="flex items-center gap-3 mb-4 pl-1">
+                        <div class="h-6 w-1.5 ${indicatorColor} rounded-full"></div>
+                        <h3 class="text-xl font-bold text-slate-800 tracking-wide">${groupName}</h3>
+                        <span class="px-2.5 py-1 rounded-md bg-white border border-slate-200 text-slate-500 text-xs font-bold shadow-sm">${seriesData.length} 台</span>
+                    </div>`;
+                const gridContainer = document.createElement('div'); gridContainer.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3';
+                
+                seriesData.forEach(d => {
+                    let extraInfo = ''; let hoverOverlay = ''; let statusClass, statusText, stripColor;
+
+                    if (d.isBorrowed) {
+                        statusClass = 'bg-amber-50 border-amber-200 text-amber-700'; statusText = '出借中'; stripColor = 'bg-amber-400';
+                        if (overviewState.filterType === 'all') {
+                            hoverOverlay = `<div class="absolute inset-y-0 right-0 left-1 bg-white/95 backdrop-blur-sm z-10 flex flex-col justify-center p-3 opacity-0 group-hover:opacity-100 transition-all duration-200 border-l border-amber-100">
+                                <div class="flex items-center gap-1.5 mb-1.5"><i data-lucide="user" class="w-3.5 h-3.5 text-blue-600"></i><span class="font-bold text-slate-800 text-sm truncate">${d.borrower}</span></div>
+                                <div class="flex items-center gap-1.5"><i data-lucide="building-2" class="w-3.5 h-3.5 text-slate-500"></i><span class="text-slate-600 text-xs truncate">${d.unit}</span></div></div>`;
+                        } else {
+                            extraInfo = `<div class="mt-2 pt-2 border-t border-slate-100 space-y-1"><div class="flex justify-between items-center"><span class="font-bold text-blue-700 text-sm truncate pr-2">${d.borrower}</span><span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap shrink-0">${d.unit}</span></div></div>`;
+                        }
+                    } else if (d.isTesting) {
+                        statusClass = 'bg-sky-50 border-sky-200 text-sky-700'; statusText = '測試中'; stripColor = 'bg-sky-400';
+                        if (overviewState.filterType === 'all') {
+                            hoverOverlay = `<div class="absolute inset-y-0 right-0 left-1 bg-white/95 backdrop-blur-sm z-10 flex flex-col justify-center p-3 opacity-0 group-hover:opacity-100 transition-all duration-200 border-l border-sky-100">
+                                <div class="flex items-center gap-1.5 mb-1.5"><i data-lucide="flask-conical" class="w-3.5 h-3.5 text-sky-600"></i><span class="font-bold text-slate-800 text-sm truncate">${d.tester}</span></div>
+                                <div class="flex items-center gap-1.5"><span class="text-sky-600 text-xs font-medium bg-sky-100 px-2 py-0.5 rounded">測試中</span></div></div>`;
+                        } else {
+                            if (overviewState.filterType !== 'testing') {
+                                extraInfo = `<div class="mt-2 pt-2 border-t border-slate-100 space-y-1"><div class="flex items-center gap-1"><i data-lucide="flask-conical" class="w-3 h-3 text-sky-600"></i><span class="font-bold text-sky-700 text-sm truncate">${d.tester}</span></div></div>`;
+                            }
+                        }
+                    } else {
+                        statusClass = 'bg-emerald-50 border-emerald-200 text-emerald-700'; statusText = '在庫'; stripColor = 'bg-emerald-400';
+                        if (overviewState.filterType === 'all') {
+                            hoverOverlay = `<div class="absolute inset-y-0 right-0 left-1 bg-white/95 backdrop-blur-sm z-10 flex flex-col items-center justify-center p-3 opacity-0 group-hover:opacity-100 transition-all duration-200 border-l border-emerald-100">
+                                <i data-lucide="mouse-pointer-click" class="w-5 h-5 text-emerald-600 mb-1"></i><span class="text-emerald-700 text-xs font-bold">點擊設定測試</span></div>`;
+                        }
+                    }
+                    const safeModel = d.model.replace(/'/g, "\\'"); const safeTester = d.tester.replace(/'/g, "\\'");
+                    const cardHTML = `
+                        <div onclick="openTestModal('${d.id}', '${safeModel}', ${d.isBorrowed}, '${safeTester}')" 
+                             class="bg-white rounded-xl p-3 border border-slate-200 shadow-sm hover:shadow-md hover:border-blue-300 transition-all flex flex-col relative overflow-hidden group h-full cursor-pointer hover:-translate-y-0.5">
+                            <div class="absolute top-0 left-0 w-1 h-full ${stripColor} z-20 transition-colors"></div>
+                            ${hoverOverlay}
+                            <div class="pl-2 flex-1 flex flex-col">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div class="font-extrabold text-slate-900 text-sm sm:text-base leading-tight line-clamp-2 flex-1 pr-1" title="${d.model}">${d.model}</div>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${statusClass} whitespace-nowrap shrink-0 transition-colors">${statusText}</span>
+                                </div>
+                                <div class="text-[10px] font-bold text-slate-400 tracking-wider uppercase mt-auto"># ${d.id}</div>
+                            </div>
+                            ${extraInfo ? `<div class="pl-2">${extraInfo}</div>` : ''}
+                        </div>`;
+                    gridContainer.insertAdjacentHTML('beforeend', cardHTML);
+                });
+                section.innerHTML = sectionHeader; section.appendChild(gridContainer); container.appendChild(section);
+            });
+            lucide.createIcons();
+        }
+
+        /* -------------------------------------------------------------------------- */
+        /* 全局初始化事件 (整合版)                               */
+        /* -------------------------------------------------------------------------- */
+        window.addEventListener('DOMContentLoaded', () => {
+            // 初始化 Lucide 圖示
+            lucide.createIcons();
+
+            // App 1 初始化
+            initApiUrl();
+            fetchData();
+            initCanvas();
+            fetchEmployeeData();
+            checkInventoryCompletion(); // 進入頁面時檢查是否顯示完成橫幅
+
+            // App 2 初始化
+            document.getElementById('over-search-input').addEventListener('input', (e) => {
+                overviewState.searchQuery = e.target.value.toLowerCase();
+                renderOverviewTable();
+            });
+            syncOverviewData();
+        });
+    </script>
+</body>
+</html>
+
