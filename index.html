@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-TW" data-theme="dark">
+<html lang="zh-TW" data-theme="light">
 
 <head>
   <meta charset="UTF-8">
@@ -75,14 +75,7 @@
         </svg>
         匯出 Excel
       </button>
-      
-      <button class="btn btn-export" id="btnWpPost" title="產出 WordPress 鑲嵌文章" style="background-color: #0073aa; border-color: #0073aa; color: white;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="16 18 22 12 16 6"></polyline>
-          <polyline points="8 6 2 12 8 18"></polyline>
-        </svg>
-        WP 鑲嵌
-      </button>
+
 
       <a class="btn btn-source" id="btnSource" href="#" target="_blank">🔗 查看原文</a>
     </div>
@@ -267,17 +260,26 @@
       </div>
       <div class="modal-body" style="text-align: left; padding: 20px;">
         <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; color: var(--text-primary);">1. 文章標題</h4>
-        <input type="text" id="wpTitle" style="width: 100%; padding: 10px; margin-bottom: 20px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;" readonly>
+        <input type="text" id="wpTitle"
+          style="width: 100%; padding: 10px; margin-bottom: 20px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px;"
+          readonly>
 
-        <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; color: var(--text-primary);">2. 文章 HTML 內容 (直接貼入 WP 預設編輯器 / 自訂 HTML 區塊)</h4>
-        <textarea id="wpContent" rows="10" style="width: 100%; padding: 10px; margin-bottom: 20px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; resize: vertical;" readonly></textarea>
+        <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; color: var(--text-primary);">2. 文章 HTML 內容 (直接貼入 WP 預設編輯器 / 自訂
+          HTML 區塊)</h4>
+        <textarea id="wpContent" rows="10"
+          style="width: 100%; padding: 10px; margin-bottom: 20px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; resize: vertical;"
+          readonly></textarea>
 
         <h4 style="margin: 0 0 8px 0; font-size: 0.95rem; color: var(--text-primary);">3. 互動式工具嵌入碼 (iframe)</h4>
-        <textarea id="wpIframe" rows="3" style="width: 100%; padding: 10px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-family: monospace; font-size: 0.85rem; resize: vertical;" readonly></textarea>
-        <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px; margin-bottom: 0;">※ 這是您的 GitHub Pages 專屬網址，直接複製貼上至 WordPress 即可使用。</p>
+        <textarea id="wpIframe" rows="3"
+          style="width: 100%; padding: 10px; background: var(--bg-card); color: var(--text-primary); border: 1px solid var(--border-color); border-radius: 6px; font-family: monospace; font-size: 0.85rem; resize: vertical;"
+          readonly></textarea>
+        <p style="font-size: 12px; color: var(--text-muted); margin-top: 6px; margin-bottom: 0;">※ 這是您的 GitHub Pages
+          專屬網址，直接複製貼上至 WordPress 即可使用。</p>
 
         <div style="margin-top: 24px; text-align: right;">
-          <button class="btn btn-export" id="btnCopyWp" style="background-color: #0073aa; border-color: #0073aa; color: white;">📋 複製文章 HTML</button>
+          <button class="btn btn-export" id="btnCopyWp"
+            style="background-color: #0073aa; border-color: #0073aa; color: white;">📋 複製文章 HTML</button>
         </div>
       </div>
     </div>
