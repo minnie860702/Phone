@@ -34,16 +34,16 @@
 
   // ── Brand config ──
   const BRAND_META = {
-    'apple':    { color: '#3b82f6', label: 'A', css: 'apple' },
-    'samsung':  { color: '#8b5cf6', label: 'S', css: 'samsung' },
-    'oppo':     { color: '#10b981', label: 'O', css: 'oppo' },
-    'vivo':     { color: '#f59e0b', label: 'v', css: 'vivo' },
-    '紅米':     { color: '#ef4444', label: 'R', css: 'redmi' },
-    'google':   { color: '#22c55e', label: 'G', css: 'google' },
-    '小米':     { color: '#fb923c', label: 'Mi', css: 'xiaomi' },
-    'realme':   { color: '#facc15', label: 're', css: 'realme' },
-    'poco':     { color: '#eab308', label: 'P', css: 'poco' },
-    'sharp':    { color: '#dc2626', label: 'SH', css: 'sharp' },
+    'apple': { color: '#3b82f6', label: 'A', css: 'apple' },
+    'samsung': { color: '#8b5cf6', label: 'S', css: 'samsung' },
+    'oppo': { color: '#10b981', label: 'O', css: 'oppo' },
+    'vivo': { color: '#f59e0b', label: 'v', css: 'vivo' },
+    '紅米': { color: '#ef4444', label: 'R', css: 'redmi' },
+    'google': { color: '#22c55e', label: 'G', css: 'google' },
+    '小米': { color: '#fb923c', label: 'Mi', css: 'xiaomi' },
+    'realme': { color: '#facc15', label: 're', css: 'realme' },
+    'poco': { color: '#eab308', label: 'P', css: 'poco' },
+    'sharp': { color: '#dc2626', label: 'SH', css: 'sharp' },
     'motorola': { color: '#5c92fa', label: 'M', css: 'motorola' },
   };
 
@@ -472,7 +472,7 @@
       if (item.status) {
         statusHtml = `<span class="rank-new" style="background:rgba(239,68,68,0.12); color:#ef4444;">${item.status}</span>`;
       }
-      
+
       tr.innerHTML = `
         <td style="font-weight:700; color:var(--text-primary); font-size:0.85rem;">${item.id}</td>
         <td style="font-size:0.85rem; color:var(--text-secondary);">${item.model}</td>
@@ -487,23 +487,23 @@
     try {
       invLoading.style.display = 'block';
       invGrid.style.display = 'none';
-      
+
       const url = 'https://script.google.com/macros/s/AKfycbxVckmqcb0HYPzqiTUrmXS4_Zc0NDXhXTCik-oaLx5s1soPkuFDxu8UoVsfjiUVyDdG/exec';
       const res = await fetch(url);
       if (!res.ok) throw new Error('Network response was not ok');
       const data = await res.json();
-      
+
       const inventoryList = data.inventory || (Array.isArray(data) ? data : []);
-      
+
       const apple = [], android = [], china = [], old = [];
-      
+
       inventoryList.forEach(item => {
         const id = item.id;
         if (!id) return;
-        
+
         let unit = (item.borrow_unit || '').trim();
         let displayStatus = '';
-        
+
         if (unit !== '機櫃' && unit !== '中班' && unit !== '歸還' && unit !== '未盤點' && unit !== '') {
           displayStatus = '出借中';
         }
@@ -514,16 +514,16 @@
         else if (id.startsWith('C')) china.push(obj);
         else if (id.startsWith('O')) old.push(obj);
       });
-      
+
       // Get latest ranking data
       const latestData = sortedDesc()[0];
       const top20 = latestData ? latestData.salesTop20 : [];
-      
+
       renderInventoryTable('invApple', apple, top20);
       renderInventoryTable('invAndroid', android, top20);
       renderInventoryTable('invChina', china, top20);
       renderInventoryTable('invOld', old, top20);
-      
+
       invLoading.style.display = 'none';
       invGrid.style.display = 'grid';
       toast('庫存資料已更新');
@@ -553,11 +553,11 @@
       const month = monthSelect.value;
       const data = MARKET_DATA.find(d => d.month === month);
       if (!data) return;
-      
+
       const [y, m] = month.split('/');
       const mNum = parseInt(m, 10);
       const titleStr = `${y}年${mNum}月 台灣手機市占率排行出爐！Top 20 熱銷機型一次看`;
-      
+
       let html = `<!-- wp:heading -->
 <h2>${y}年${mNum}月台灣手機銷售 Top 20 排行榜</h2>
 <!-- /wp:heading -->
@@ -584,13 +584,13 @@ ${data.salesTop20.slice(0, 5).map(item => `<li><strong>No.${item.rank}：</stron
       wpTitle.value = titleStr;
       wpContent.value = html;
       wpIframe.value = `<iframe src="https://minnie860702.github.io/Phone/?month=${month}" width="100%" height="2600" style="border:none; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" allowfullscreen></iframe>`;
-      
+
       wpModal.style.display = 'flex';
     });
-    
+
     if (wpModalClose) wpModalClose.addEventListener('click', () => wpModal.style.display = 'none');
     if (wpModal) wpModal.addEventListener('click', e => { if (e.target === wpModal) wpModal.style.display = 'none'; });
-    
+
     if (btnCopyWp) btnCopyWp.addEventListener('click', () => {
       navigator.clipboard.writeText(wpContent.value).then(() => {
         toast('文章 HTML 已複製！');
@@ -608,7 +608,7 @@ ${data.salesTop20.slice(0, 5).map(item => `<li><strong>No.${item.rank}：</stron
 
   populateMonthSelect();
   const desc = sortedDesc();
-  
+
   if (initMonth && desc.some(d => d.month === initMonth)) {
     monthSelect.value = initMonth;
   } else if (desc.length) {
@@ -624,7 +624,7 @@ ${data.salesTop20.slice(0, 5).map(item => `<li><strong>No.${item.rank}：</stron
 
   // ── PWA Service Worker ──
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
+    navigator.serviceWorker.register('sw.js').catch(() => { });
   }
 
 })();
