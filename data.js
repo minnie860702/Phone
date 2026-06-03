@@ -1446,5 +1446,43 @@ const MARKET_DATA = [
       { "brand": "SHARP", "share": 1.1, "change": "+0.1%", "rank": 9 },
       { "brand": "motorola", "share": 0.9, "change": "+0.1%", "rank": 10 }
     ]
+  },
+  {
+    "month": "2026/04",
+    "sourceUrl": "https://www.sogi.com.tw/articles/jyes/6268888",
+    "salesTop20": [
+      { "rank": 1, "brand": "Apple", "model": "iPhone 17 256GB" },
+      { "rank": 2, "brand": "Apple", "model": "iPhone 17 Pro 256GB" },
+      { "rank": 3, "brand": "Apple", "model": "iPhone 17 Pro Max 256GB" },
+      { "rank": 4, "brand": "Samsung", "model": "Galaxy A56 5G 12GB/256GB" },
+      { "rank": 5, "brand": "Samsung", "model": "Galaxy A17 6GB/128GB" },
+      { "rank": 6, "brand": "Apple", "model": "iPhone 17e 256GB" },
+      { "rank": 7, "brand": "Samsung", "model": "Galaxy S26 Ultra 12GB/512GB" },
+      { "rank": 8, "brand": "Apple", "model": "iPhone 17 Pro Max 512GB" },
+      { "rank": 9, "brand": "Apple", "model": "iPhone 17 Pro 512GB" },
+      { "rank": 10, "brand": "Samsung", "model": "Galaxy A56 5G 8GB/256GB" },
+      { "rank": 11, "brand": "OPPO", "model": "A6s 6GB/128GB" },
+      { "rank": 12, "brand": "Google", "model": "Pixel 10a" },
+      { "rank": 13, "brand": "Samsung", "model": "Galaxy A17 8GB/128GB" },
+      { "rank": 14, "brand": "OPPO", "model": "Reno15 12GB/256GB" },
+      { "rank": 15, "brand": "vivo", "model": "Y29s 5G 6GB/128GB" },
+      { "rank": 16, "brand": "Apple", "model": "iPhone 17 512GB" },
+      { "rank": 17, "brand": "vivo", "model": "V60 12GB/256GB" },
+      { "rank": 18, "brand": "Samsung", "model": "Galaxy S25 FE 5G 8GB/256GB" },
+      { "rank": 19, "brand": "OPPO", "model": "Reno15 Pro Max 12GB/512GB" },
+      { "rank": 20, "brand": "Samsung", "model": "Galaxy S26+ 12GB/256GB" }
+    ],
+    "brandShare": [
+      { "brand": "Apple", "share": 39.1, "change": "-1.1%", "rank": 1 },
+      { "brand": "Samsung", "share": 25.5, "change": "-0.7%", "rank": 2 },
+      { "brand": "OPPO", "share": 11.8, "change": "-0.1%", "rank": 3 },
+      { "brand": "vivo", "share": 7.3, "change": "+0.5%", "rank": 4 },
+      { "brand": "Google", "share": 4.1, "change": "+0.3%", "rank": 5 },
+      { "brand": "紅米", "share": 3.1, "change": "+0.1%", "rank": 6 },
+      { "brand": "POCO", "share": 1.7, "change": "-0.1%", "rank": 7 },
+      { "brand": "小米", "share": 1.7, "change": "+0.1%", "rank": 8 },
+      { "brand": "SHARP", "share": 1.0, "change": "-0.1%", "rank": 9 },
+      { "brand": "motorola", "share": 0.8, "change": "-0.1%", "rank": 10 }
+    ]
   }
 ];
