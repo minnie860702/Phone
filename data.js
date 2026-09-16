@@ -1560,5 +1560,81 @@ const MARKET_DATA = [
       { "brand": "SHARP", "share": 1.1, "change": "0.0%", "rank": 9 },
       { "brand": "motorola", "share": 0.9, "change": "+0.1%", "rank": 10 }
     ]
+  },
+  {
+    "month": "2026/07",
+    "sourceUrl": "https://www.sogi.com.tw/articles/jyes/6269388",
+    "salesTop20": [
+      { "rank": 1, "brand": "Apple", "model": "iPhone 17 256GB" },
+      { "rank": 2, "brand": "Apple", "model": "iPhone 17 Pro Max 256GB" },
+      { "rank": 3, "brand": "Samsung", "model": "Galaxy A57 5G 12GB/256GB" },
+      { "rank": 4, "brand": "Samsung", "model": "Galaxy A17 6GB/128GB" },
+      { "rank": 5, "brand": "Apple", "model": "iPhone 17 Pro 256GB" },
+      { "rank": 6, "brand": "Samsung", "model": "Galaxy S26 Ultra 12GB/512GB" },
+      { "rank": 7, "brand": "Apple", "model": "iPhone 17e 256GB" },
+      { "rank": 8, "brand": "Samsung", "model": "Galaxy A57 5G 8GB/256GB" },
+      { "rank": 9, "brand": "OPPO", "model": "A6s 6GB/128GB" },
+      { "rank": 10, "brand": "Apple", "model": "iPhone 17 Pro Max 512GB" },
+      { "rank": 11, "brand": "Google", "model": "Pixel 10a" },
+      { "rank": 12, "brand": "OPPO", "model": "Reno15 12GB/256GB" },
+      { "rank": 13, "brand": "Samsung", "model": "Galaxy A17 8GB/128GB" },
+      { "rank": 14, "brand": "vivo", "model": "Y21 5G 6GB/128GB" },
+      { "rank": 15, "brand": "vivo", "model": "V60 12GB/256GB" },
+      { "rank": 16, "brand": "Apple", "model": "iPhone 17 Pro 512GB" },
+      { "rank": 17, "brand": "Samsung", "model": "Galaxy S25 FE 5G 8GB/256GB" },
+      { "rank": 18, "brand": "OPPO", "model": "Reno15 Pro Max 12GB/512GB" },
+      { "rank": 19, "brand": "Google", "model": "Pixel 10" },
+      { "rank": 20, "brand": "Samsung", "model": "Galaxy S26+ 12GB/256GB" }
+    ],
+    "brandShare": [
+      { "brand": "Apple", "share": 37.8, "change": "-0.7%", "rank": 1 },
+      { "brand": "Samsung", "share": 26.5, "change": "+0.4%", "rank": 2 },
+      { "brand": "OPPO", "share": 12.2, "change": "+0.2%", "rank": 3 },
+      { "brand": "vivo", "share": 7.5, "change": "+0.2%", "rank": 4 },
+      { "brand": "Google", "share": 4.4, "change": "+0.1%", "rank": 5 },
+      { "brand": "紅米", "share": 3.3, "change": "+0.1%", "rank": 6 },
+      { "brand": "小米", "share": 1.9, "change": "+0.1%", "rank": 7 },
+      { "brand": "POCO", "share": 1.4, "change": "-0.1%", "rank": 8 },
+      { "brand": "SHARP", "share": 1.1, "change": "0.0%", "rank": 9 },
+      { "brand": "motorola", "share": 0.9, "change": "0.0%", "rank": 10 }
+    ]
+  },
+  {
+    "month": "2026/08",
+    "sourceUrl": "https://www.sogi.com.tw/articles/jyes/6269388",
+    "salesTop20": [
+      { "rank": 1, "brand": "Samsung", "model": "Galaxy A57 5G 12GB/256GB" },
+      { "rank": 2, "brand": "Apple", "model": "iPhone 17 256GB" },
+      { "rank": 3, "brand": "Apple", "model": "iPhone 17 Pro Max 256GB" },
+      { "rank": 4, "brand": "Samsung", "model": "Galaxy A17 6GB/128GB" },
+      { "rank": 5, "brand": "Samsung", "model": "Galaxy S26 Ultra 12GB/512GB" },
+      { "rank": 6, "brand": "Apple", "model": "iPhone 17 Pro 256GB" },
+      { "rank": 7, "brand": "OPPO", "model": "A6s 6GB/128GB" },
+      { "rank": 8, "brand": "Samsung", "model": "Galaxy A57 5G 8GB/256GB" },
+      { "rank": 9, "brand": "Apple", "model": "iPhone 17e 256GB" },
+      { "rank": 10, "brand": "Google", "model": "Pixel 10a" },
+      { "rank": 11, "brand": "OPPO", "model": "Reno15 12GB/256GB" },
+      { "rank": 12, "brand": "vivo", "model": "Y21 5G 6GB/128GB" },
+      { "rank": 13, "brand": "Samsung", "model": "Galaxy A17 8GB/128GB" },
+      { "rank": 14, "brand": "vivo", "model": "V60 12GB/256GB" },
+      { "rank": 15, "brand": "Apple", "model": "iPhone 17 Pro Max 512GB" },
+      { "rank": 16, "brand": "Samsung", "model": "Galaxy S25 FE 5G 8GB/256GB" },
+      { "rank": 17, "brand": "OPPO", "model": "Reno15 Pro Max 12GB/512GB" },
+      { "rank": 18, "brand": "Google", "model": "Pixel 10" },
+      { "rank": 19, "brand": "Samsung", "model": "Galaxy S26+ 12GB/256GB" },
+      { "rank": 20, "brand": "Apple", "model": "iPhone 17 Pro 512GB" }
+    ],
+    "brandShare": [
+      { "brand": "Apple", "share": 36.5, "change": "-1.3%", "rank": 1 },
+      { "brand": "Samsung", "share": 27.2, "change": "+0.7%", "rank": 2 },
+      { "brand": "OPPO", "share": 12.5, "change": "+0.3%", "rank": 3 },
+      { "brand": "vivo", "share": 7.6, "change": "+0.1%", "rank": 4 },
+      { "brand": "Google", "share": 4.5, "change": "+0.1%", "rank": 5 },
+      { "brand": "紅米", "share": 3.4, "change": "+0.1%", "rank": 6 },
+      { "brand": "小米", "share": 2.0, "change": "+0.1%", "rank": 7 },
+      { "brand": "POCO", "share": 1.3, "change": "-0.1%", "rank": 8 },
+      { "brand": "SHARP", "share": 1.1, "change": "0.0%", "rank": 9 },
+      { "brand": "motorola", "share": 0.9, "change": "0.0%", "rank": 10 }
+    ]
   }
 ];
